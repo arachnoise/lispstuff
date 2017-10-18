@@ -1,93 +1,45 @@
-;A way to learn lisp
-
-;Implement basic versions of parsing techniques.
-;I would do this to see if my approach is sound, and if I properly
-;understand the algorithms.
-
-;today I will try implementing a naive Unger style parser for CF grammars.
-;It has an exponential time but refining the algorithm can reduce this to
-;polynomial time.
-
-;How does Unger's work?
-;It works like putting marbles in cup
-;If I have a sentence "pqrs" I could partition the terminals like so
-;
-;For example:
-;	The grammar S->EFG S->HI S->J
-;
-;-------------------------------
-;				S
-;-----------+-----------+-------
-;	E		| 	F		| 	G
-;-----------+-----------+-------
-;	pq		|	r		|	s
-;	p		|	qr		|	s	
-;	p		|	q		|	rs
-;
-; So given a rule, the parser will search from available possibilities
-;
-;
-;	Unger's parser works from the top down, applying rule-list and creating a
-;parse tree for a sentence (if the rule-list match)
-;
-;Now, given a definition of rule-list, can I parse a string?
-
-;Try a sample grammar
-
-;S -> aSb | ab
-
-;What needs to be done
-;read input file
-;create grammar rule-list from file input
-;store grammar rule-list as a list of rule-production pairs
-;
-;Applying rule-list
-;This could be done via a simple string substitution
-;
-;Creating a parse-tree
-;Can use a left-most tree derivation to store tree as a list
-;
-;Implementing a control mechanism
-;No idea yet
-;
-;Some questions on implementation:
-
-;How do I represent rule-list and productions?
-;How do I store parse trees and predictions?
-;How do I transform strings based on rule-list?
-
-;rule-list are represented as 3 sections
-;LHS assignment RHS
-
-;validating rule-list - cases:
-;correct
-;empty line
-;no assignment operator
-;lhs empty
-;lhs more than one symbol
-;lhs doesn't define rule with substitution specifier
-;lhs uses substitution specifier too many times
-;rhs empty
-
-(load "D:/documents/programming/lisp/treewalk.lisp")
-(load "D:/documents/programming/lisp/grammar_ops.lisp")
-(load "D:/documents/programming/lisp/string_ops.lisp")
-
-;move grammar analysis to own file
-;move input reader to own file
-;move string operations to own file
+;naive unger attempt 2
 
 (defvar *grammar-ex* 
-	'(("$S" "$A$B")
-		("$S" "$D$C")
-		("$A" "a")
-		("$A" "a$A")
-		("$B" "bc")
-		("$B" "b$Bc")
-		("$C" "c")
-		("$C" "c$C")
-		("$D" "ab")
-		("$D" "a$Db")))
+	'((S  (A B))						;0
+		(S  (D C))						;1
+		(A ("a"))						;2
+		(A ("a" A))						;3
+		(B ("b" "c"))					;4
+		(B ("b" B "c"))					;5
+		(C ("c"))						;6
+		(C ("c" C))						;7
+		(D ("a" "b"))					;8
+		(D ("a" D "b"))))				;9
+		
+;
+; let's create the pseudo-code for the unger parser here.
+; How will I do it? 
+;	I will start first by using the pseudocode as a description
+;	for the routines in question.
+;
+;	Then create a copy and use this to flesh out the function description
+;
+; How does it work?
+;	The unger parser works by parsing from the top down, using the
+;	language grammar as a description
+;
+;	Start with a sentence and a base rule
+;	For each sub-rule derived from the base rule
+;		If the sub-rule is a match then									(base case)
+;			return the rule
+;		Else if the sub-rule is a possible match then					(recursive case)
+;			Partition the sentence into m subdivisions 
+;				(where m is the number of tokens in the sub-rule)
+;			For each partition
+;				Call recursive function on each partition
+;					(with the current sub-rule as the new base rule)
+;				If the call succeeds
+;					append function's parse tree to current parse tree
+;					continue
+;				else return failure
+;		If no matches possible											(base case)
+;			return failure
 
 
 ;generates possible partitions for an input sentence
@@ -104,89 +56,144 @@
 				(labels
 					((gen-part (unfilled partitioned-output partial-sentence)
 						(cond ((<= unfilled 1)
-								(push (reverse (push partial-sentence partitioned-output))
+								(push 
+									(reverse (push partial-sentence partitioned-output))
 									set-partitions))
 							(t 
 								(let ((extra-letters (+ 1 (- (length partial-sentence) unfilled))))
 									(do ((i 1 (1+ i)))
 										((> i extra-letters))
 										(gen-part (- unfilled 1)
-											(append (list (subseq partial-sentence 0 i)) partitioned-output)
+											(append 
+												(list 
+													(subseq partial-sentence 0 i))
+													partitioned-output)
 											(subseq partial-sentence i))))))))
 					(gen-part num-partitions () sentence))
 				set-partitions))))
-		
-;an unger parser works from the top down,
-;searching through a forest of possible parse trees
-(defun unger-parse (rule-list sentence)
-	(let ((parse-trees nil))
-		(new-expand-specials 
-				(grammar-non-terms rule-list))
-		(rec-unger-parse rule-list sentence "$S" parse-trees)
-		parse-trees))
-;start with start-symbol $S
-;look for matching rule-list to this
-;create partitions for partial sentence
-;try each rule recursively
 
+(defun unger-parse (sentence)
+	(list 'S (unger-aux-derivations sentence *grammar-ex* 'S)))
 
-;this version is big and ugly
-;
-;
-(defun rec-unger-parse (rule-list sentence-part parse-item parse-tree)
-	(let ((found-match nil))
-		(if (< 0 (length 
-					(remove-terminals rule-list parse-item)))
-			(let ((matched-rules
-							(match-rule-to-symbol rule-list parse-item)))
-							
-				(format t "~%matching rules for ~a are ~a" parse-item matched-rules)
-				
-				(dolist (match matched-rules)
-					(let* ((prod-list 
-								(expand-string 
-									(second match) :mark-specials t))
-								(partition-list 
-									(gen-partitions
-										(length prod-list)
-										sentence-part)))		
-										
-						(format t "~%attempting match rule ~a to sentence ~a" match sentence-part)
-						(print prod-list)
-						(print partition-list)
-						
-						(dolist (curr-part partition-list)
-						
-							(format t "~%For partition set ~a" curr-part)
-							
-							(do 
-								((part curr-part (rest curr-part))
-									(parse-items prod-list (rest parse-items)))
-								((or 
-									(null part) 
-									(null parse-items)))
-									
-								(format t "~%matching ~a to ~a length ~a"
-									(first parse-items)
-									(first part)
-									(length (first part)))	
-									
-								(match-msg 
-									(setf found-match
-										(rec-unger-parse 
-											rule-list 
-											(first part) 
-											(first parse-items)
-											parse-tree))
-									(first parse-items) 
-									(first part))
-								(unless found-match (return)))))))
-			(setf found-match (equal sentence-part parse-item)))
-		found-match))
-		
-(defun match-msg (ifif item-a item-b)
-	(let ((msg-yes "~%~a matches ~a")
-				(msg-no "~%~a doesn't match ~a"))
-	(if ifif
-		(format t msg-yes item-a item-b)
-		(format t msg-no item-a item-b))))
+;Start with a sentence and a base rule	
+
+; Pseudocode header
+;	For each production derived from the base rule
+;		If the production is a match then								(base case)
+;			return the rule
+;		Else if the production is a possible match then					(recursive case)
+;			Partition the sentence into m subdivisions 
+;				(where m is the number of tokens in the sub-rule)
+;			For each partition
+;				Call recursive function on each partition
+;					(with the corresponding token as the new base rule)
+;				If the call succeeds
+;					append function's parse tree to current parse tree
+;					continue
+;				else return failure
+;		If no matches possible											(base case)
+;			return failure
+(defun unger-aux-derivations (sentence rule-list nt-symb)
+	(dolist (derived-rule 												;For each rule derived from the base symbol
+			(match-rule-to-symbol 
+				rule-list 
+				nt-symb))
+			(let ((p-tree (get-production derived-rule)))
+				(cond 
+					((definite-match sentence derived-rule)				;(base case) If the rule is a match then
+						(progn 
+							(format t "~a matches ~a~%" sentence derived-rule)
+							(return p-tree)))							;return the rule
+					((potential-match sentence derived-rule)			;(recursive case) if the rule is a possible match then
+						(progn
+							(format t "~a is a potential match for ~a~%" sentence derived-rule)
+							(let ((result 
+										(unger-aux-partitions 			;call partition handler
+											sentence 
+											rule-list
+											derived-rule)))
+								(when result							;if it returns a valid result
+									(return result)))))					;attach to current parse tree
+																		;else continue
+					(T 
+						(format t "~a does not match ~a~%" sentence derived-rule))))))		;(base case) If no matches possible
+															;return failure
+															
+;this function handles parse-tree generation. Adjust accordingly
+(defun unger-aux-partitions (sentence rule-list rule)
+	(let* ((prod (get-production rule))
+			(num-tokens (length prod))
+			(partition-set (gen-partitions num-tokens sentence)))
+		(dolist (part-sentence partition-set)
+			(print part-sentence)											;For each partitioned sentence
+			(let ((p-tree nil))
+				(block part-check
+					(dotimes (i num-tokens)
+						(let ((r-item (nth i prod))							;For each item in the rule
+								(p-item (nth i part-sentence)))				;and each corresponding partition
+							(format t "r-item is ~a and p-item is ~a~%" r-item p-item)
+							(if (symbolp r-item)
+								(let ((result 								;if the item is a non-terminal then call parser on it
+										(unger-aux-derivations 
+											p-item
+											rule-list
+											r-item)))						;with rule item as the new base rule
+									(format t "r-item is a symbol~%")	
+									(if result								;if the call succeeds append result to parse tree
+										(setf p-tree
+											(append p-tree `((,r-item ,result))))
+										(progn
+											(setf p-tree nil)
+											(return-from part-check)))) 	;else break
+								(if (equal 
+										(list r-item) p-item)				;if item is a terminal symbol then check for a match
+									(progn
+										(format t "r-item and p-item are equal~%")
+										(setf p-tree 
+											(append p-tree `((,r-item)))))	;if it matches, append to parse tree
+									(progn
+										(format t "r-item and p-item are not equal~%")
+										(setf p-tree nil)
+										(return-from part-check)))))))		;else break
+					(when p-tree
+						(return p-tree))))))
+
+;	what are the conditions for a definite match?
+(defun definite-match (sentence rule)
+	(let ((prod (get-production rule)))
+		(if (has-nt-syms prod)			;the rule production has no non-terminal symbols
+			nil
+			(equal sentence prod))))	;the sentence and rule are identical
+			
+;	what are the conditions for a potential match?
+;	(empty rules are not allowed)
+(defun potential-match (sentence rule)
+	(let ((prod (get-production rule)))
+	(if (has-nt-syms prod)				;the rule production has terminal symbols
+		(gte-length sentence prod)		;the sentence is longer than the rule
+		nil)))
+
+(defun gte-length (lst1 lst2)
+	(>= (length lst1) (length lst2)))
+	
+;checks for the existence of non-terminal symbols in a grammar production
+(defun has-nt-syms (prod)
+	(if (find-if #'symbolp prod)
+		T
+		nil))
+
+(defun get-production (rule)
+	(second rule))
+
+(defun get-base (rule)
+	(first rule))
+	
+(defun match-rule-to-symbol (rule-list token)
+	(remove-if-not 
+		#' (lambda (x) (equal (first x) token)) 
+		rule-list))
+	
+(defun match-prod-to-symbol (rule-list token)
+	(remove-if-not 
+		#' (lambda (x) (search token (first (rest x)))) 
+		rule-list))

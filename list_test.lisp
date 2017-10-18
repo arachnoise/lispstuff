@@ -66,8 +66,10 @@
 			(labels 
 				((rec-p-tree ()
 						(when work-list
-							(let ((prod (prod-from-num (first work-list)))
-										(p-tree (list (pop work-list))))
+							(let 
+								((prod 
+										(prod-from-num (first work-list)))
+									(p-tree (list (pop work-list))))
 								(dolist (sym prod)	
 									(when (symbolp sym)										
 										(setf p-tree
@@ -96,8 +98,6 @@
 					accum)))
 		(nreverse accum)))
 			
-
-(defun matching-rules (rule-sym))
 	
 (defun has-symbols (lst)
 	(dolist (elt lst)

@@ -9,106 +9,42 @@
 ;keep it simple: permutations can be generated for each set
 ;
 ;idea for evaluation:
-;test case by case
-;		extra marbles in 1 cup
-;		extra marbles in 2 cups
-;		...
-;   extra marbles in m cups
-;
-;		extra marbles in 1 cup -> 1 + (m-n) marbles in cup
-;		extra marbles in m cups -> 2 marbles in each cup
-
-;
-; (1+m-n) 1 1 1 1
-; (m-n)	  2 1 1 1
-;	(m-n-1) 3 1 1 1
-; etc etc etc
-
-;try this
-;put all marbles in 1st cup
-;put one marble each in 2nd cup
-;		put remaining marbles in 1st cup
-;		put one marble each in 2 cups
-;			put remaining marbles in 1st cup
-;		...
-
-;put one marble each in 3 cups
-;		put remaining marbles in 1st cup
-;		put one marble each in 2nd cup...
-;			put remaining marbles in 1st cup
-;		...
-
-;suppose there are 6 extra marbles
-;one cup: 
-;	7 1 1 ...
-
-;two cups: 
-;	6 2 1 ...
-;	5 3
-;	4 4
-
-;three cups
-; 5 2 2
-; 4 3 2
-; 3 3 3
-
-;four cups
-; 4 2 2 2 
-; 3 3 2 2
-
-;five cups
-;3 2 2 2 2 2
-
-;six cups
-;2 2 2 2 2 2
-
-;set sizes
-;1
-;2 1
-;2 2 1
-;...
-;3 1
-;3 2 1
-;3 2 2 1
-;
-;4 1
-;4 2 1
-;
-;4 3 1
-;
 ;so set of n cups
 ;put all marbles in 1 cup
-;put all but one in 1st cup
-;		start at 2nd cup put all extra marbles in cup
-;		start at 2nd cup put all but one in cup
+;take one out put it in 2nd cup
+;		start at 2nd cup take one out and put in 3rd
+;		start at 3rd cup ...
+;take another marble out and put it in 2nd cup
+;...
+;...
 ;
 ;keep taking out marbles and sending to next iteration
-;until marbles equals 2nd cup or is 1 greater
+;each recursive case acts on a subset of the previous
 ;
-;this version assumes there are enough marbles to fill all cups
-;it doesn't work right!
+;this version works alright
 (defun marbles-cups(num-cups num-marbles)
 	;check to make sure there are enough marbles for every cup
-	(if (< num-marbles num-cups) (return-from marbles-cups)
-		(let ((solution-list '()))
-			(labels ((gen-marble-list (m-cup-list cups-left extra-marbles position)
-					(cond ((<= cups-left 1)
-						(push m-cup-list solution-list))
-						((<= extra-marbles 0)
-							(push m-cup-list solution-list))
-						(t (do ((1st-fill extra-marbles (1- 1st-fill))
-										(2nd-fill 0	(1+ 2nd-fill)))
-										((< 1st-fill 2nd-fill) nil)
-								(let ((rec-mc-list (copy-list m-cup-list)))
-									(setf (elt rec-mc-list position) 1st-fill)
-									(format t "1st cup ~a 2nd cup ~a position ~a~%" 1st-fill 2nd-fill position)
-									(format t "copying list: ~a~%" rec-mc-list)
-									(gen-marble-list  rec-mc-list
-										(- cups-left 1) 
-										2nd-fill 
-										(+ position 1))))))))
-			(gen-marble-list (make-list num-cups :initial-element 0) num-cups (- num-marbles num-cups) 0))
-		solution-list)))
+	(cond ((< num-marbles num-cups) 
+			(return-from marbles-cups))
+		((< num-cups 1)
+			(return-from marbles-cups))
+		(t (let ((solution-list '()))
+				(labels ((gen-mc-list (m-cup-list position)
+					(let ((cups-left (- (length m-cup-list) position)))
+							(if (= cups-left 1)
+									(push m-cup-list solution-list)
+								(let ((1st-pos (nthcdr position m-cup-list))
+											(2nd-pos (nthcdr (+ position 1) m-cup-list)))
+									(do ((1st-cup (first 1st-pos) (1- 1st-cup))
+										(2nd-cup (first 2nd-pos) (1+ 2nd-cup)))
+										((< 1st-cup 1) nil)
+									(setf (first 1st-pos) 1st-cup)
+									(setf (first 2nd-pos) 2nd-cup)
+									(gen-mc-list (copy-list m-cup-list) (+ position 1))))))))
+					(let ((start-mc-list (make-list (- num-cups 1) :initial-element 1)))
+					(push (- (+ num-marbles 1) num-cups) start-mc-list)
+					(gen-mc-list start-mc-list 0)))
+			(nreverse solution-list)))))
 
 ;bags could be defined as a collection of items.
 ;the pair (x y) represents x occuring y times in the bag
@@ -165,7 +101,6 @@
 		item-list))
 
 ;Workable but didn't work how I expected
-;I don't understand bindings and references right, right?
 (defun remove-zero-items (a-bag)
 		(remove-if #' (lambda (item) 
 				(equal (nth 1 item) 0)) a-bag))

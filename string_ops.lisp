@@ -3,8 +3,12 @@
 ;tokenizing
 ;mark non-terminals position and length
 ;then split into pieces
-(load "D:/documents/programming/lisp/list_ops.lisp")
-(load "D:/documents/programming/lisp/treewalk.lisp")
+
+(load (merge-pathnames "list_ops.lisp" *load-pathname*))
+(load (merge-pathnames "treewalk.lisp" *load-pathname*))
+
+;(load "D:/documents/programming/lisp/list_ops.lisp")
+;(load "D:/documents/programming/lisp/treewalk.lisp")
 
 (defun tokenise (strs delimiters &key keep-d)
 	(let ((token-list (make-as-list strs)))
